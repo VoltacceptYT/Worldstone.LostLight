@@ -1,6 +1,7 @@
 // 2D rendering on the main (top) screen: 8-bit software framebuffer on a Mode 5 bitmap.
 #include "game.h"
 #include "assets.h"
+#include "ui.h"
 
 constexpr int SW = 256, SH = 192;
 constexpr int TILE = 32, TSHIFT = 5;
@@ -37,11 +38,12 @@ static void setPalette() {
     pal(P_WALL_FACE_DK, 5, 5, 8); pal(P_MORTAR, 3, 3, 5);
     pal(P_PIL_TOP, 18, 16, 13); pal(P_PIL_SIDE, 12, 10, 8); pal(P_PIL_DK, 7, 5, 4);
     pal(P_SHADOW, 1, 1, 2);
-    pal(P_SLIME, 6, 20, 10);    pal(P_SLIME_LT, 12, 27, 16); pal(P_SLIME_DK, 3, 12, 7);   pal(P_EYE_YL, 31, 31, 12);
-    pal(P_BONE, 27, 27, 23);    pal(P_BONE_DK, 16, 16, 14);  pal(P_BLADE, 22, 24, 28);
-    pal(P_CLOAK, 22, 10, 3);    pal(P_CLOAK_DK, 12, 5, 2);   pal(P_ARROW, 25, 18, 8);
-    pal(P_OGRE, 11, 15, 9);     pal(P_OGRE_DK, 6, 9, 6);     pal(P_OGRE_ARMOR, 15, 11, 7);
-    pal(P_HORN, 28, 26, 20);    pal(P_EYE_RED, 31, 6, 3);
+    // Hive-inspired enemy palette: pale chitin, dark carapace, glowing green energy.
+    pal(P_SLIME, 5, 26, 10);    pal(P_SLIME_LT, 14, 31, 18); pal(P_SLIME_DK, 2, 14, 6);   pal(P_EYE_YL, 24, 31, 10);
+    pal(P_BONE, 22, 23, 19);    pal(P_BONE_DK, 12, 13, 11);  pal(P_BLADE, 20, 26, 22);
+    pal(P_CLOAK, 9, 7, 13);     pal(P_CLOAK_DK, 5, 4, 8);    pal(P_ARROW, 12, 31, 14);
+    pal(P_OGRE, 10, 12, 10);    pal(P_OGRE_DK, 5, 6, 6);     pal(P_OGRE_ARMOR, 14, 13, 11);
+    pal(P_HORN, 25, 24, 18);    pal(P_EYE_RED, 8, 31, 14);
     pal(P_GOLD, 31, 25, 2);     pal(P_GOLD_DK, 22, 15, 1);   pal(P_GOLD_LT, 31, 29, 12);
     pal(P_POTION, 28, 3, 5);    pal(P_POTION_LT, 31, 14, 16); pal(P_GLASS, 26, 27, 28);
     pal(P_CHEST, 14, 8, 3);     pal(P_CHEST_DK, 8, 4, 2);    pal(P_CHEST_BAND, 22, 16, 4);
@@ -50,7 +52,7 @@ static void setPalette() {
     pal(P_BLOOD, 28, 4, 4);     pal(P_HEAL, 4, 28, 8);       pal(P_GREY, 20, 20, 20);
     pal(P_ARC, 18, 27, 31);     pal(P_TELE, 31, 16, 6);
     for (int i = 0; i < PLAYER_PAL_N; i++) BG_PALETTE[PLAYER_PAL_BASE + i] = kPlayerPal[i];
-    for (int i = 0; i < GHOST_PAL_N; i++) BG_PALETTE[GHOST_PAL_BASE + i] = kGhostPal[i];
+    for (int i = 0; i < SHARD_PAL_N; i++) BG_PALETTE[SHARD_PAL_BASE + i] = kShardPal[i];
 }
 
 // ------------------------------------------------------------- primitives
@@ -287,7 +289,7 @@ struct Fig {
     int s8;
     u8 body, head, leg, weapon, trim, eye;
     int arm;
-    bool bow, horns;
+    bool bow, horns, crest, bigEye;
 };
 
 static void drawFig(const Fig& g) {
@@ -308,7 +310,17 @@ static void drawFig(const Fig& g) {
     int hl = g.x - S(5) + d * S(1), headTop = torsoTop - S(10);
     rect(hl, headTop, S(10), S(10), g.head);
     int ex = d > 0 ? hl + S(10) - S(4) : hl + S(1);
-    rect(ex, headTop + S(3), S(3), S(2) < 2 ? 2 : S(2), g.eye);
+    if (g.bigEye) {
+        int ew = S(4) < 3 ? 3 : S(4);
+        rect(d > 0 ? hl + S(10) - ew - S(1) : hl + S(1), headTop + S(2), ew, ew, g.eye);
+    } else {
+        rect(ex, headTop + S(3), S(3), S(2) < 2 ? 2 : S(2), g.eye);
+    }
+    if (g.crest) {
+        int bx0 = d > 0 ? hl + S(1) : hl + S(9);
+        line(bx0, headTop + S(1), bx0 - d * S(8), headTop - S(4), S(2), P_BONE_DK);
+        line(bx0, headTop + S(4), bx0 - d * S(9), headTop + S(1), S(2), P_BONE_DK);
+    }
     if (g.horns) {
         line(hl + S(1), headTop, hl - S(2), headTop - S(8), S(2), P_HORN);
         line(hl + S(9), headTop, hl + S(12), headTop - S(8), S(2), P_HORN);
@@ -401,13 +413,6 @@ static void drawSlash() {
 }
 
 // ------------------------------------------------------------------ enemies
-static void hpBar(int cx, int top, int w, int frac256) {
-    if (frac256 < 0) frac256 = 0;
-    if (frac256 > 256) frac256 = 256;
-    rawRect(cx - w / 2, top, w, 3, P_BAR_BG);
-    rawRect(cx - w / 2, top, w * frac256 / 256, 3, P_BAR_FG);
-}
-
 static void drawEnemy(const Enemy& e) {
     int sx = toSX(e.x), sy = toSY(e.z);
     u8 flash = e.hurt > 0 ? (u8)P_WHITE : (u8)0;
@@ -415,22 +420,25 @@ static void drawEnemy(const Enemy& e) {
     int barTop = sy - 30;
 
     switch (e.type) {
-    case E_SLIME: {
+    case E_SLIME: {   // Thrall-style: hunched, clawed scuttler
         int s = fsin(e.anim * 1300);
-        int hop = (e.st == ES_IDLE) ? 0 : (iabs(s) * 6) >> 12;
-        int sq = (s * 2) >> 12;
+        int hop = (e.st == ES_IDLE) ? 0 : (iabs(s) * 4) >> 12;
+        int sw = (e.st == ES_IDLE) ? 0 : (s * 3) >> 12;
+        int d = fsin(e.face) < 0 ? -1 : 1;
         shadow(sx, sy, 11, 4);
         s_ovr = flash;
-        rect(sx - 13, sy - 5, 4, 5, P_SLIME_DK);
-        rect(sx + 9, sy - 5, 4, 5, P_SLIME_DK);
-        ellipse(sx, sy - 9 - hop, 12 + sq, 9 - sq, P_SLIME, false);
-        ellipse(sx - 3, sy - 13 - hop, 6, 3, P_SLIME_LT, false);
-        rect(sx - 7, sy - 11 - hop, 4, 4, P_EYE_YL);
-        rect(sx + 3, sy - 11 - hop, 4, 4, P_EYE_YL);
-        rect(sx - 6, sy - 10 - hop, 2, 3, P_INK);
-        rect(sx + 4, sy - 10 - hop, 2, 3, P_INK);
+        line(sx - d * 5, sy - 7 - hop, sx - d * 9 - sw, sy, 3, P_BONE_DK);   // hind legs
+        line(sx + d * 1, sy - 7 - hop, sx + d * 3 + sw, sy, 3, P_BONE_DK);
+        ellipse(sx - d * 2, sy - 11 - hop, 9, 6, P_BONE_DK, false);          // hunched torso
+        for (int i = 0; i < 3; i++)                                           // spine ridge
+            line(sx - d * (7 - i * 3), sy - 15 - hop, sx - d * (8 - i * 3), sy - 19 - hop + i, 2, P_BONE);
+        ellipse(sx + d * 8, sy - 12 - hop, 5, 4, P_BONE, false);              // low forward head
+        rect(sx + d * 9 - 1, sy - 14 - hop, 2, 2, P_EYE_RED);                 // glowing eyes
+        rect(sx + d * 6 - 1, sy - 14 - hop, 2, 2, P_EYE_RED);
+        line(sx + d * 3, sy - 9 - hop, sx + d * 15, sy - 3 - sw, 2, P_BONE);  // long claws
+        line(sx - d * 1, sy - 8 - hop, sx + d * 11, sy - 1 + sw, 2, P_BONE);
         s_ovr = 0;
-        barTop = sy - 26 - hop;
+        barTop = sy - 24 - hop;
         break;
     }
     case E_SKELETON:
@@ -441,10 +449,10 @@ static void drawEnemy(const Enemy& e) {
         bool skel = e.type == E_SKELETON;
         g.s8 = skel ? 8 : 7;
         if (skel) {
-            g.body = P_BONE; g.head = P_BONE; g.leg = P_BONE_DK; g.weapon = P_BLADE; g.trim = P_BONE_DK; g.eye = P_EYE_RED;
+            g.body = P_OGRE; g.head = P_BONE; g.leg = P_OGRE_DK; g.weapon = P_BLADE; g.trim = P_OGRE_ARMOR; g.eye = P_EYE_RED; g.horns = true;
             g.arm = e.st == ES_WINDUP ? 1 : (e.st == ES_STRIKE ? 2 : 0);
         } else {
-            g.body = P_CLOAK; g.head = P_CLOAK_DK; g.leg = P_CLOAK_DK; g.weapon = P_ARROW; g.trim = P_GOLD_DK; g.eye = P_EYE_YL;
+            g.body = P_CLOAK; g.head = P_BONE_DK; g.leg = P_CLOAK_DK; g.weapon = P_ARROW; g.trim = P_BONE_DK; g.eye = P_EYE_RED; g.crest = true;
             g.bow = true;
             g.arm = e.st == ES_WINDUP ? 2 : 0;
         }
@@ -461,7 +469,7 @@ static void drawEnemy(const Enemy& e) {
         g.moving = e.st == ES_CHASE || e.st == ES_STRIKE;
         g.s8 = 18;
         g.body = P_OGRE; g.head = P_OGRE; g.leg = P_OGRE_DK; g.weapon = P_HORN; g.trim = P_OGRE_ARMOR; g.eye = P_EYE_RED;
-        g.horns = true;
+        g.horns = true; g.bigEye = true;
         g.arm = (e.st == ES_WINDUP && e.aux == 0) ? 3 : (e.st == ES_RECOVER ? 2 : 0);
         shadow(sx, sy, 24, 7);
         s_ovr = tele ? (u8)P_TELE : flash;
@@ -471,8 +479,8 @@ static void drawEnemy(const Enemy& e) {
         break;
     }
     }
-    if (e.hp < e.maxhp || e.type == E_BOSS)
-        hpBar(sx, barTop, e.type == E_BOSS ? 44 : 20, e.hp * 256 / e.maxhp);
+    if (e.type != E_BOSS && e.hp < e.maxhp)
+        uiQueuePlate((int)(&e - g_en), sx, barTop);   // boss uses the pinned bar instead
 }
 
 static bool onScreen(int sx, int sy, int m) {
@@ -591,6 +599,8 @@ void gfxInit() {
     s_vram = (u8*)bgGetGfxPtr(bg);
     bgUpdate();
     setPalette();
+    uiPaletteInit(BG_PALETTE);
+    uiSetTarget(s_buf, SW, SH);
     buildTiles();
     memset(s_buf, 0, sizeof(s_buf));
     memset(s_win, 0, sizeof(s_win));
@@ -616,26 +626,31 @@ void gfxRenderWorld(bool frozen) {
     drawActors(frame);
     drawProjAndParts();
     drawSlash();
+    uiNameplatesFlush(frame);
+    uiBossBar(frame);
+    uiTopOverlay(s_buf, frame);
     present();
 }
 
 void gfxRenderTitle(int frame) {
-    memset(s_buf, P_WHITE, sizeof(s_buf));
-    centerText(SW / 2, 22, "WORLDSTONE", 3, 4, P_INK);
-    centerText(SW / 2, 48, "LOST LIGHT", 2, 4, P_INK);
+    uiTitleBackdrop(s_buf, frame);
+    centerText(SW / 2, 26, "WORLDSTONE", 3, 4, UP_TEXT);
+    centerText(SW / 2, 52, "LOST LIGHT", 2, 4, UP_PURPLE_LT);
     int bob = (frame >> 5) & 1;
     blitStretch(kPlayerIdle, 64, 64, SW / 2 - 66, 70 + bob, 128, 128, false, 0);
+    uiTitleForeground(s_buf, frame);
     present();
 }
 
 void gfxRenderDeath(int frame) {
-    memset(s_buf, P_WHITE, sizeof(s_buf));
+    uiDeathBackdrop(s_buf, frame);
     int bob = (fsin(frame * 500) * 3) >> 12;
-    blitStretch(kGhostDied, 48, 48, SW / 2 - 69, 6 + bob, 144, 144, false, 0);
-    centerText(SW / 2, 134, "GUARDIAN DOWN", 2, 4, P_INK);
+    blitStretch(kShardDied, 48, 48, SW / 2 - 72, 14 + bob, 144, 144, false, 0);
+    uiDeathForeground(s_buf, frame);
+    centerText(SW / 2, 150, "GUARDIAN DOWN", 2, 4, UP_RED_LT);
     char b[40];
     snprintf(b, sizeof(b), "LIGHT %d   KILLS %d", g_pl.lvl, g_pl.kills);
-    centerText(SW / 2, 160, b, 1, 4, P_INK);
-    if ((frame >> 5) & 1) centerText(SW / 2, 178, "PRESS START", 1, 4, P_INK);
+    centerText(SW / 2, 168, b, 1, 4, UP_TEXT);
+    if ((frame >> 5) & 1) centerText(SW / 2, 178, "PRESS START", 1, 4, UP_TEXT_DIM);
     present();
 }

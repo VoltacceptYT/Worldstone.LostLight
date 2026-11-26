@@ -2,3 +2,4 @@ build/
 nitrofs/
 *.nds
 *.dsi
+*.zip

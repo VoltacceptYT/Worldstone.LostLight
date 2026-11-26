@@ -112,7 +112,7 @@ static void playerHurt(int dmg, fx fx_, fx fz_) {
     if (p.state == PS_ATTACK) p.state = PS_IDLE;
     if (p.hp <= 0) {
         p.hp = 0; p.state = PS_DEAD;
-        msg("Your Ghost cannot revive you.");
+        msg("Your Shard cannot revive you.");
     } else {
         msg("Ouch! -%d HP", dmg);
     }
