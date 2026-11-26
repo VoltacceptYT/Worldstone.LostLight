@@ -1,0 +1,29 @@
+# Worldstone: Lost Light
+**Unofficial fan-made Destiny 2 action RPG for the Nintendo DS.**
+Not affiliated with, endorsed by, or sponsored by Bungie, Inc. or Sony. *Destiny* and *Destiny 2* are
+trademarks of Bungie, Inc. This is a non-commercial fan project: it contains no Bungie assets
+(no audio, text or code). The player and Ghost sprites in `assets/` are project-supplied pixel art;
+tiles, enemies and effects are drawn procedurally.
+
+You are a Guardian delving a Hive-infested ruin in search of the Lost Light. Thralls, Acolytes and
+Vandals guard procedurally generated rooms; a Hive Ogre waits at the end. Decode engrams for better
+Edges (7 tiers up to the Exotic), gather Glimmer and healing cells, and raise your Light level.
+
+## Build (BlocksDS, same flow as gtasands)
+    make                 # local BlocksDS if $BLOCKSDS exists, else Docker image skylyrac/blocksds:slim-v1.24.0
+    make build-ds        # build/worldstone.nds
+    make build-dsi       # build/worldstone.dsi
+    make DEBUG=1         # -Og build
+
+## Controls
+D-Pad move | A sword combo | B dodge | Y arc burst | X healing cell | START pause
+
+## Graphics
+Top screen is a 2D top-down view (8-bit software framebuffer on a Mode 5 bitmap, 32px tiles).
+- `assets/player_idle.png` - player sprite (faces right, mirrored when facing left)
+- `assets/Ghost_Died.png` - death screen
+- Font: 5-row pixel font traced from `assets/font_reference.png` (D E S T I N Y are exact; the other
+  glyphs are built in the same style). It is used for the title/death screens and the bottom-screen console.
+
+`src/assets.cpp` is generated. After editing the PNGs or glyph table in `tools/gen_assets.py`, run
+`python3 tools/gen_assets.py` (needs Pillow). The ROM build itself does not need Python.

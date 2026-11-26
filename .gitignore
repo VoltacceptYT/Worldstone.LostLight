@@ -1,0 +1,4 @@
+build/
+nitrofs/
+*.nds
+*.dsi

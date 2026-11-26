@@ -1,0 +1,48 @@
+BLOCKSDS ?= /opt/wonderful/thirdparty/blocksds/core
+WONDERFUL_TOOLCHAIN ?= /opt/wonderful
+CXX := $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-g++
+MODE ?= ds
+DEBUG ?= 0
+OUT := build/tmp/$(MODE)
+SPECS := $(BLOCKSDS)/sys/crts/$(if $(filter dsi,$(MODE)),dsi,ds)_arm9.specs
+FLAGS := -marm -mcpu=arm946e-s+nofp -ffunction-sections -fdata-sections -DARM9 -Isrc \
+	-isystem $(BLOCKSDS)/libs/libnds/include -specs=$(SPECS)
+ifeq ($(MODE),dsi)
+FLAGS += -DWORLDSTONE_DSI
+endif
+ifeq ($(DEBUG),1)
+FLAGS += -Og -DWORLDSTONE_DEBUG
+else
+FLAGS += -O2
+endif
+SOURCES := $(wildcard src/*.cpp)
+OBJECTS := $(patsubst %.cpp,$(OUT)/%.o,$(SOURCES))
+ELF := $(OUT)/worldstone.elf
+ROM := build/worldstone.$(if $(filter dsi,$(MODE)),dsi,nds)
+
+.PHONY: all build build-ds build-dsi clean
+.DEFAULT_GOAL := all
+all: build
+build: build-ds build-dsi
+build-ds:
+	@$(MAKE) -f Makefile.blocksds --no-print-directory MODE=ds build/worldstone.nds
+build-dsi:
+	@$(MAKE) -f Makefile.blocksds --no-print-directory MODE=dsi build/worldstone.dsi
+clean:
+	rm -rf build
+
+force:
+$(OUT)/.optsig: force
+	@mkdir -p $(OUT)
+	@printf '%s\n' '$(FLAGS)' | cmp -s - $@ || printf '%s\n' '$(FLAGS)' > $@
+$(OUT)/src/%.o: src/%.cpp $(OUT)/.optsig
+	@mkdir -p $(dir $@)
+	$(CXX) $(FLAGS) -std=gnu++17 -fno-rtti -fno-exceptions -Wall -Wextra -MMD -MP -c $< -o $@
+$(ELF): $(OBJECTS)
+	$(CXX) $(OBJECTS) -marm -mcpu=arm946e-s+nofp -specs=$(SPECS) -L$(BLOCKSDS)/libs/libnds/lib \
+	    -Wl,-Map,$(OUT)/worldstone.map -Wl,--start-group -lnds9 -lstdc++ -lc -lm -Wl,--end-group -o $@
+build/worldstone.nds build/worldstone.dsi: $(ELF) icon.bmp
+	@mkdir -p build
+	$(BLOCKSDS)/tools/ndstool/ndstool -c $@ -9 $< -7 $(BLOCKSDS)/sys/arm7/main_core/arm7_minimal.elf \
+	    -b icon.bmp "Worldstone: Lost Light;Unofficial Destiny 2 fan ARPG;Fan-made. Not affiliated with Bungie."
+-include $(OBJECTS:.o=.d)
