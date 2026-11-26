@@ -13,25 +13,24 @@ void hudInit() {
     font.numColors = 16;
     font.bpp = 4;
     font.asciiOffset = 32;
-    font.convertSingleColor = false;
     consoleSetFont(con, &font);
     consoleClear();
 }
 
 void hudTitle() {
     consoleClear();
-    iprintf("\x1b[1;0H    W O R L D S T O N E\n");
-    iprintf("         LOST LIGHT\n\n");
-    iprintf("  UNOFFICIAL FAN-MADE GAME\n");
-    iprintf("  Not affiliated with Bungie.\n");
-    iprintf("  Destiny 2 (c) Bungie, Inc.\n\n");
-    iprintf(" D-Pad .... move\n");
-    iprintf(" A ........ sword combo\n");
-    iprintf(" B ........ dodge\n");
-    iprintf(" Y ........ arc burst\n");
-    iprintf(" X ........ healing cell\n");
-    iprintf(" START .... pause\n\n");
-    iprintf("   Press START, Guardian");
+    printf("\x1b[1;0H    W O R L D S T O N E\n");
+    printf("         LOST LIGHT\n\n");
+    printf("  UNOFFICIAL FAN-MADE GAME\n");
+    printf("  Not affiliated with Bungie.\n");
+    printf("  Destiny 2 (c) Bungie, Inc.\n\n");
+    printf(" D-Pad .... move\n");
+    printf(" A ........ sword combo\n");
+    printf(" B ........ dodge\n");
+    printf(" Y ........ arc burst\n");
+    printf(" X ........ healing cell\n");
+    printf(" START .... pause\n\n");
+    printf("   Press START, Guardian");
 }
 
 static void bar(char* out, int v, int mx, int w) {
@@ -42,8 +41,8 @@ static void bar(char* out, int v, int mx, int w) {
 }
 
 void hudBanner(const char* l1, const char* l2) {
-    iprintf("\x1b[11;0H%-32s", l1);
-    iprintf("\x1b[13;0H%-32s", l2);
+    printf("\x1b[11;0H%-32s", l1);
+    printf("\x1b[13;0H%-32s", l2);
 }
 
 void hudDraw(int frame) {
@@ -51,16 +50,16 @@ void hudDraw(int frame) {
     char b[24];
     if (frame % 3 == 0) {
         int room = 0;
-        iprintf("\x1b[0;0H WORLDSTONE  Light %-2d Kills %-3d", p.lvl, p.kills);
+        printf("\x1b[0;0H WORLDSTONE  Light %-2d Kills %-3d", p.lvl, p.kills);
         bar(b, p.hp, p.maxhp, 14);
-        iprintf("\x1b[1;0H HP [%s] %3d/%-3d ", b, p.hp, p.maxhp);
+        printf("\x1b[1;0H HP [%s] %3d/%-3d ", b, p.hp, p.maxhp);
         bar(b, p.stam, p.maxstam, 14);
-        iprintf("\x1b[2;0H ST [%s]         ", b);
+        printf("\x1b[2;0H ST [%s]         ", b);
         bar(b, p.xp, xpNeeded(p.lvl), 14);
-        iprintf("\x1b[3;0H XP [%s] %3d/%-3d ", b, p.xp, xpNeeded(p.lvl));
-        iprintf("\x1b[4;0H Glimmer %-5d Cells x%d ATK %-3d", p.gold, p.potions, 8 + p.str * 2 + p.weapon * 3);
-        iprintf("\x1b[5;0H Wpn: %-26s", kWeaponName[p.weapon]);
-        for (int i = 0; i < 3; i++) iprintf("\x1b[%d;0H %-31s", 6 + i, g_msg[i]);
+        printf("\x1b[3;0H XP [%s] %3d/%-3d ", b, p.xp, xpNeeded(p.lvl));
+        printf("\x1b[4;0H Glimmer %-5d Cells x%d ATK %-3d", p.gold, p.potions, 8 + p.str * 2 + p.weapon * 3);
+        printf("\x1b[5;0H Wpn: %-26s", kWeaponName[p.weapon]);
+        for (int i = 0; i < 3; i++) printf("\x1b[%d;0H %-31s", 6 + i, g_msg[i]);
         (void)room;
     }
     if (frame % 6 == 0) {
@@ -99,8 +98,8 @@ void hudDraw(int frame) {
                 else if (iabs(e.x - p.x) < FXI(7) && iabs(e.z - p.z) < FXI(7)) put(e.x, e.z, 'x');
             }
             put(p.x, p.z, '@');
-            iprintf("\x1b[%d;0H%s", 9 + r, row);
+            printf("\x1b[%d;0H%s", 9 + r, row);
         }
-        iprintf("\x1b[23;0H A:atk B:roll Y:spin X:potion");
+        printf("\x1b[23;0H A:atk B:roll Y:spin X:potion");
     }
 }
